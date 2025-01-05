@@ -1,0 +1,6 @@
+.venv/
+*.json
+train/**
+valid/**
+*.zip
+__pycache__/*
