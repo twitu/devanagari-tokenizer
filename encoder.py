@@ -1,6 +1,7 @@
 from tqdm import tqdm
 from collections import Counter
 from matplotlib import pyplot as plt
+import json
 
 
 class BytePairEncoder:
@@ -191,6 +192,51 @@ class BytePairEncoder:
     def decode(self, token_ids: list[int]) -> str:
         """Convert token indices back to text"""
         return "".join(self.itos[idx] for idx in token_ids)
+
+    def save_to_file(self, filepath: str) -> None:
+        """
+        Save encoder state to a JSON file.
+        
+        Args:
+            filepath: Path where to save the encoder state
+        """
+        state = {
+            'chars': self.chars,
+            'stoi': self.stoi,  # Only save stoi, we can reconstruct itos
+            'max_token_length': self.max_token_length,
+            'stats': self.stats
+        }
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        
+        print(f"Encoder saved to {filepath}")
+
+    @classmethod
+    def load_from_file(cls, filepath: str) -> 'BytePairEncoder':
+        """
+        Load encoder state from a JSON file.
+        
+        Args:
+            filepath: Path to the saved encoder state
+        
+        Returns:
+            BytePairEncoder: New instance with loaded state
+        """
+        with open(filepath, 'r', encoding='utf-8') as f:
+            state = json.load(f)
+        
+        # Create a dummy instance (we'll override its state)
+        instance = cls("")
+        
+        # Restore state
+        instance.chars = state['chars']
+        instance.stoi = state['stoi']
+        instance.itos = {i: s for s, i in state['stoi'].items()}  # Reconstruct itos from stoi
+        instance.max_token_length = state['max_token_length']
+        instance.stats = state['stats']
+        
+        return instance
 
 # # Example usage
 # text <-- load text from dataset
