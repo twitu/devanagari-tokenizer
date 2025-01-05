@@ -20,10 +20,15 @@ class BytePairEncoder:
             "compression_ratios": [1.0],
             "merge_counts": [],
             "tokens_created": [],
+            "max_token_lengths": [1],
         }
 
         # Store original length for compression ratio
         self.original_length = len(self.data)
+
+        # Add max token length tracking
+        self.max_token_length = 1  # Start with single characters
+        self.stats['max_token_lengths'] = [1]  # Track evolution of max length
 
     def get_digram_stats(self):
         """Get digram counts"""
@@ -55,6 +60,9 @@ class BytePairEncoder:
         next_idx = len(self.itos)
         self.stoi[pair_str] = next_idx
         self.itos[next_idx] = pair_str
+        
+        # Update max token length
+        self.max_token_length = max(self.max_token_length, len(pair_str))
         return next_idx
 
     def update_stats(self, merge_count: int, new_token: str):
@@ -135,8 +143,54 @@ class BytePairEncoder:
         ax4.set_ylabel("New Token Length")
         ax4.set_title("Token Length Evolution")
 
+        # Add max token length evolution plot
+        ax4.plot(self.stats['vocab_sizes'], self.stats['max_token_lengths'])
+        ax4.set_xlabel('Vocabulary Size')
+        ax4.set_ylabel('Maximum Token Length')
+        ax4.set_title('Maximum Token Length Evolution')
+
         plt.tight_layout()
         plt.show()
+
+    def tokenize(self, text: str) -> list[str]:
+        """
+        Tokenize text by checking all possible prefixes up to max_token_length
+        and selecting the longest matching token.
+        
+        Args:
+            text: Input text to tokenize
+        Returns:
+            List of tokens
+        """
+        tokens = []
+        while len(text) > 0:
+            # Try prefixes of increasing length up to max_token_length
+            best_token = None
+            prefix_length = min(len(text), self.max_token_length)
+            
+            for length in range(1, prefix_length + 1):
+                prefix = text[:length]
+                if prefix in self.stoi:
+                    best_token = prefix
+            
+            if best_token is None:
+                # No token found - take first character
+                tokens.append(text[0])
+                text = text[1:]
+            else:
+                # Use the longest matching token found
+                tokens.append(best_token)
+                text = text[len(best_token):]
+        
+        return tokens
+
+    def encode(self, text: str) -> list[int]:
+        """Convert text to token indices"""
+        return [self.stoi[token] for token in self.tokenize(text)]
+
+    def decode(self, token_ids: list[int]) -> str:
+        """Convert token indices back to text"""
+        return "".join(self.itos[idx] for idx in token_ids)
 
 # # Example usage
 # text <-- load text from dataset
