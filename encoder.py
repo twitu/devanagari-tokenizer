@@ -112,8 +112,18 @@ class BytePairEncoder:
         pbar.close()
         print(f"\nFinal vocabulary size: {len(self.itos):,}")
 
-    def plot_statistics(self):
-        """Visualize the encoding statistics"""
+    def plot_statistics(self, iteration: int = None, live_plot: bool = False):
+        """
+        Visualize the encoding statistics
+        
+        Args:
+            iteration: Current iteration number (for live plotting)
+            live_plot: Whether to clear output for live updates
+        """
+        if live_plot:
+            from IPython.display import clear_output
+            clear_output(wait=True)
+        
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
 
         # Plot 1: Vocabulary Size vs Data Size
@@ -129,25 +139,29 @@ class BytePairEncoder:
         ax2.set_title("Compression Ratio vs Vocabulary Size")
 
         # Plot 3: Merge Counts Distribution
-        ax3.hist(self.stats["merge_counts"], bins=30)
-        ax3.set_xlabel("Number of Merges")
-        ax3.set_ylabel("Frequency")
-        ax3.set_title("Distribution of Merge Counts")
+        if self.stats["merge_counts"]:  # Only plot if we have merge counts
+            ax3.hist(self.stats["merge_counts"], bins=30)
+            ax3.set_xlabel("Number of Merges")
+            ax3.set_ylabel("Frequency")
+            ax3.set_title("Distribution of Merge Counts")
 
         # Plot 4: Token Lengths Over Time
-        token_lengths = [len(token) for token in self.stats["tokens_created"]]
-        ax4.plot(range(len(token_lengths)), token_lengths)
-        ax4.set_xlabel("Merge Operation")
-        ax4.set_ylabel("New Token Length")
-        ax4.set_title("Token Length Evolution")
-
-        # Add max token length evolution plot
-        ax4.plot(self.stats["vocab_sizes"], self.stats["max_token_lengths"])
-        ax4.set_xlabel("Vocabulary Size")
-        ax4.set_ylabel("Maximum Token Length")
-        ax4.set_title("Maximum Token Length Evolution")
+        if self.stats["tokens_created"]:  # Only plot if we have tokens
+            token_lengths = [len(token) for token in self.stats["tokens_created"]]
+            ax4.plot(range(len(token_lengths)), token_lengths)
+            ax4.set_xlabel("Merge Operation")
+            ax4.set_ylabel("New Token Length")
+            ax4.set_title("Token Length Evolution")
 
         plt.tight_layout()
+        
+        # Print current statistics if live plotting
+        if iteration is not None:
+            print(f"\nIteration {iteration}")
+            print(f"Current vocabulary size: {len(self.itos):,}")
+            print(f"Current data size: {len(self.data):,}")
+            print(f"Current compression ratio: {self.stats['compression_ratios'][-1]:.2f}")
+        
         plt.show()
 
     def tokenize(self, text: str) -> list[str]:
