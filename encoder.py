@@ -75,42 +75,95 @@ class BytePairEncoder:
         self.stats["merge_counts"].append(merge_count)
         self.stats["tokens_created"].append(new_token)
 
-    def encode_to_vocab_size(self, target_vocab_size: int) -> None:
-        """Perform BPE encoding until reaching target vocabulary size"""
+    def merge_byte_pair(self) -> tuple[int, str, int]:
+        """
+        Merge the top byte pair
+        
+        Returns:
+            tuple: (new_token_id, new_token_str, merge_count) or None if no more pairs to merge
+        """
+        # Get pair frequencies
+        stats = self.get_digram_stats()
+        if not stats:  # No more pairs to merge
+            return None
+        
+        # Find most frequent pair
+        (top_pair, count) = max(stats.items(), key=lambda x: x[1])
+        
+        # Add new token to vocabulary
+        new_idx = self.encode_pair(top_pair)
+        
+        # Replace pairs in data
+        self.data = self.replace_byte_pair_in_data(top_pair, new_idx)
+        
+        # Update statistics
+        self.update_stats(count, self.itos[new_idx])
+        
+        return new_idx, self.itos[new_idx], count
 
-        # Add info about processing mode to progress bar description
+    def print_progress(self, iteration: int, new_token: str, merge_count: int):
+        """
+        Print training progress in text format
+        
+        Args:
+            iteration: Current iteration number
+            new_token: Newly created token
+            merge_count: Number of merges for this token
+        """
+        print(f"\nIteration {iteration:,}")
+        print(f"Created token: '{new_token}' (merged {merge_count:,} times)")
+        print(f"Current vocabulary size: {len(self.itos):,}")
+        print(f"Current data size: {len(self.data):,}")
+        print(f"Current compression ratio: {self.stats['compression_ratios'][-1]:.2f}")
+        print("-" * 80)
+
+    def encode_to_vocab_size(self, target_vocab_size: int, 
+                            plot_interval: int = None, 
+                            print_interval: int = 100) -> None:
+        """
+        Perform BPE encoding until reaching target vocabulary size
+        
+        Args:
+            target_vocab_size: Maximum vocabulary size to reach
+            plot_interval: How often to plot statistics (None for no plotting)
+            print_interval: How often to print progress (None for no printing)
+        """
+        mode = "parallel" if len(self.data) >= self.MULTIPROCESSING_THRESHOLD else "sequential"
         pbar = tqdm(
             total=target_vocab_size,
-            desc=f"Encoding byte pairs",
+            desc=f"Encoding byte pairs ({mode} mode)",
             initial=len(self.chars),
             position=0,
             leave=True,
         )
 
+        iteration = 0
         while len(self.itos) < target_vocab_size:
-            # Get pair frequencies
-            stats = self.get_digram_stats()
-            if not stats:  # No more pairs to merge
+            # Train one iteration
+            result = self.merge_byte_pair()
+            if result is None:  # No more pairs to merge
                 print("No more pairs to merge!")
                 break
-
-            # Find most frequent pair
-            (top_pair, count) = max(stats.items(), key=lambda x: x[1])
-
-            # Add new token to vocabulary
-            new_idx = self.encode_pair(top_pair)
-
-            # Replace pairs in data
-            self.data = self.replace_byte_pair_in_data(top_pair, new_idx)
-
-            # Update statistics
-            self.update_stats(count, self.itos[new_idx])
-
+            
+            new_idx, new_token, merge_count = result
+            iteration += 1
+            
             # Update progress bar
             pbar.update(1)
+            
+            # Print progress at intervals if requested
+            if print_interval and iteration % print_interval == 0:
+                self.print_progress(iteration, new_token, merge_count)
+            
+            # Plot statistics at intervals if requested
+            if plot_interval and iteration % plot_interval == 0:
+                self.plot_statistics(iteration=iteration, live_plot=True)
 
         pbar.close()
-        print(f"\nFinal vocabulary size: {len(self.itos):,}")
+        
+        # Final statistics
+        print(f"\nTraining completed after {iteration:,} iterations")
+        print(f"Final vocabulary size: {len(self.itos):,}")
 
     def plot_statistics(self, iteration: int = None, live_plot: bool = False):
         """
