@@ -29,31 +29,32 @@ class BytePairEncoder:
 
         # Add max token length tracking
         self.max_token_length = 1  # Start with single characters
-        self.stats['max_token_lengths'] = [1]  # Track evolution of max length
+        self.stats["max_token_lengths"] = [1]  # Track evolution of max length
 
-    def get_digram_stats(self):
+    def get_digram_stats(self) -> Counter:
         """Get digram counts"""
         counts = Counter()
         for pair in zip(self.data, self.data[1:]):
-            # Convert tensor elements to integers and create a tuple
             pair = (int(pair[0]), int(pair[1]))
             counts[pair] += 1
         return counts
 
-    def replace_byte_pair_in_data(
-        self, pair: tuple[int, int], new_token: int
-    ) -> list[int]:
+    def replace_byte_pair_in_data(self, pair: tuple[int, int], new_token: int) -> list:
         """Replace given byte pair with new token in data"""
-        data_list = self.data
+        result = []
         i = 0
-        while i < len(data_list) - 1:
-            if data_list[i] == pair[0] and data_list[i + 1] == pair[1]:
-                data_list[i] = new_token
-                del data_list[i + 1]
+        while i < len(self.data):
+            if (
+                i < len(self.data) - 1
+                and self.data[i] == pair[0]
+                and self.data[i + 1] == pair[1]
+            ):
+                result.append(new_token)
+                i += 2
             else:
+                result.append(self.data[i])
                 i += 1
-
-        return data_list
+        return result
 
     def encode_pair(self, pair: tuple[int, int]) -> int:
         """Add a new token to vocabulary from pair"""
@@ -61,7 +62,7 @@ class BytePairEncoder:
         next_idx = len(self.itos)
         self.stoi[pair_str] = next_idx
         self.itos[next_idx] = pair_str
-        
+
         # Update max token length
         self.max_token_length = max(self.max_token_length, len(pair_str))
         return next_idx
@@ -76,10 +77,11 @@ class BytePairEncoder:
 
     def encode_to_vocab_size(self, target_vocab_size: int) -> None:
         """Perform BPE encoding until reaching target vocabulary size"""
-        initial_vocab_size = len(self.itos)
+
+        # Add info about processing mode to progress bar description
         pbar = tqdm(
             total=target_vocab_size,
-            desc="Encoding byte pairs",
+            desc=f"Encoding byte pairs",
             initial=len(self.chars),
             position=0,
             leave=True,
@@ -103,11 +105,6 @@ class BytePairEncoder:
 
             # Update statistics
             self.update_stats(count, self.itos[new_idx])
-
-            # Print progress
-            # print(
-            #     f"Encoded {count:,} occurrences of '{self.itos[top_pair[0]]}{self.itos[top_pair[1]]}'"
-            # )
 
             # Update progress bar
             pbar.update(1)
@@ -145,10 +142,10 @@ class BytePairEncoder:
         ax4.set_title("Token Length Evolution")
 
         # Add max token length evolution plot
-        ax4.plot(self.stats['vocab_sizes'], self.stats['max_token_lengths'])
-        ax4.set_xlabel('Vocabulary Size')
-        ax4.set_ylabel('Maximum Token Length')
-        ax4.set_title('Maximum Token Length Evolution')
+        ax4.plot(self.stats["vocab_sizes"], self.stats["max_token_lengths"])
+        ax4.set_xlabel("Vocabulary Size")
+        ax4.set_ylabel("Maximum Token Length")
+        ax4.set_title("Maximum Token Length Evolution")
 
         plt.tight_layout()
         plt.show()
@@ -157,7 +154,7 @@ class BytePairEncoder:
         """
         Tokenize text by checking all possible prefixes up to max_token_length
         and selecting the longest matching token.
-        
+
         Args:
             text: Input text to tokenize
         Returns:
@@ -168,12 +165,12 @@ class BytePairEncoder:
             # Try prefixes of increasing length up to max_token_length
             best_token = None
             prefix_length = min(len(text), self.max_token_length)
-            
+
             for length in range(1, prefix_length + 1):
                 prefix = text[:length]
                 if prefix in self.stoi:
                     best_token = prefix
-            
+
             if best_token is None:
                 # No token found - take first character
                 tokens.append(text[0])
@@ -181,8 +178,8 @@ class BytePairEncoder:
             else:
                 # Use the longest matching token found
                 tokens.append(best_token)
-                text = text[len(best_token):]
-        
+                text = text[len(best_token) :]
+
         return tokens
 
     def encode(self, text: str) -> list[int]:
@@ -196,47 +193,50 @@ class BytePairEncoder:
     def save_to_file(self, filepath: str) -> None:
         """
         Save encoder state to a JSON file.
-        
+
         Args:
             filepath: Path where to save the encoder state
         """
         state = {
-            'chars': self.chars,
-            'stoi': self.stoi,  # Only save stoi, we can reconstruct itos
-            'max_token_length': self.max_token_length,
-            'stats': self.stats
+            "chars": self.chars,
+            "stoi": self.stoi,  # Only save stoi, we can reconstruct itos
+            "max_token_length": self.max_token_length,
+            "stats": self.stats,
         }
-        
-        with open(filepath, 'w', encoding='utf-8') as f:
+
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
-        
+
         print(f"Encoder saved to {filepath}")
 
     @classmethod
-    def load_from_file(cls, filepath: str) -> 'BytePairEncoder':
+    def load_from_file(cls, filepath: str) -> "BytePairEncoder":
         """
         Load encoder state from a JSON file.
-        
+
         Args:
             filepath: Path to the saved encoder state
-        
+
         Returns:
             BytePairEncoder: New instance with loaded state
         """
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             state = json.load(f)
-        
+
         # Create a dummy instance (we'll override its state)
         instance = cls("")
-        
+
         # Restore state
-        instance.chars = state['chars']
-        instance.stoi = state['stoi']
-        instance.itos = {i: s for s, i in state['stoi'].items()}  # Reconstruct itos from stoi
-        instance.max_token_length = state['max_token_length']
-        instance.stats = state['stats']
-        
+        instance.chars = state["chars"]
+        instance.stoi = state["stoi"]
+        instance.itos = {
+            i: s for s, i in state["stoi"].items()
+        }  # Reconstruct itos from stoi
+        instance.max_token_length = state["max_token_length"]
+        instance.stats = state["stats"]
+
         return instance
+
 
 # # Example usage
 # text <-- load text from dataset
