@@ -7,16 +7,16 @@ sdk: gradio
 sdk_version: 5.9.1
 app_file: app.py
 pinned: false
-short_description: देवnagari tokenizer | >3.2 compression ratio | 4500 tokens
+short_description: देवnagari tokenizer | 3.7 compression ratio | 5100 tokens
 ---
 
-A Byte Pair Encoding (BPE) tokenizer for the Devanagari script. Trained on cleaned Wikipedia hindi articles, this tokenizer achieves a compression ratio of 3.5x using a vocabulary of just 4,500 tokens.
+A Byte Pair Encoding (BPE) tokenizer for the Devanagari script. Trained on cleaned Wikipedia hindi articles, this tokenizer achieves a compression ratio of 3.7 a vocabulary of 5100 tokens.
 
 ## Features
 
 - Specialized for Devanagari script
-- Achieves 3.5x compression ratio
-- Vocabulary size: 4,500 tokens
+- Achieves 3.7x compression ratio
+- Vocabulary size: 5100 tokens
 - Handles common Hindi text patterns effectively
 - Built-in text cleaning and normalization
 
