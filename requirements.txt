@@ -3,3 +3,5 @@ tqdm
 matplotlib
 datasets
 emoji
+gradio>=4.0.0
+colorsys
