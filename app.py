@@ -1,46 +1,30 @@
 import gradio as gr
 from encoder import BytePairEncoder
-import random
-import colorsys
 
-class ColorTokenizer:
+class TokenVisualizer:
     def __init__(self, model_path: str):
         self.encoder = BytePairEncoder.load_from_file(model_path)
-        self.color_cache = {}  # Cache colors for tokens
-        
-    def _get_token_color(self, token: str) -> str:
-        """Generate and cache a consistent pastel color for a token"""
-        if token not in self.color_cache:
-            # Generate pastel color using HSV
-            hue = random.random()  # Random hue
-            saturation = 0.3  # Low saturation for pastel
-            value = 1.0  # High value for brightness
-            
-            # Convert to RGB
-            rgb = colorsys.hsv_to_rgb(hue, saturation, value)
-            # Convert to hex
-            self.color_cache[token] = '#{:02x}{:02x}{:02x}'.format(
-                int(rgb[0] * 255), 
-                int(rgb[1] * 255), 
-                int(rgb[2] * 255)
-            )
-        return self.color_cache[token]
     
-    def tokenize_with_colors(self, text: str) -> tuple[str, dict]:
-        """Tokenize text and return colored HTML representation and stats"""
+    def tokenize_with_styling(self, text: str) -> tuple[str, dict]:
+        """Tokenize text and return styled HTML representation and stats"""
         if not text.strip():
             return "", {"Tokens": 0, "Characters": 0, "Compression": 0}
         
         # Tokenize
         tokens = self.encoder.tokenize(text)
         
-        # Generate HTML with colored tokens
+        # Generate HTML with styled tokens
         html_parts = []
         for token in tokens:
-            color = self._get_token_color(token)
             html_parts.append(
-                f'<span style="background-color: {color}; '
-                f'padding: 0.2em; margin: 0.1em; border-radius: 0.2em;">{token}</span>'
+                f'<span style="'
+                f'border: 1px solid #ccc; '
+                f'border-radius: 4px; '
+                f'padding: 0.2em 0.4em; '
+                f'margin: 0.1em; '
+                f'display: inline-block; '
+                f'background-color: #f8f9fa; '
+                f'">{token}</span>'
             )
         
         # Calculate statistics
@@ -54,11 +38,11 @@ class ColorTokenizer:
 
 def process_text(text: str) -> tuple[gr.HTML, dict]:
     """Process input text and return visualization and stats"""
-    html, stats = tokenizer.tokenize_with_colors(text)
+    html, stats = tokenizer.tokenize_with_styling(text)
     return html, stats
 
 # Initialize tokenizer
-tokenizer = ColorTokenizer("assets/hindi_tokenizer.json")
+tokenizer = TokenVisualizer("hindi_tokenizer.json")
 
 # Create Gradio interface
 demo = gr.Interface(
@@ -77,7 +61,7 @@ demo = gr.Interface(
     title="Hindi BPE Tokenizer Visualization",
     description="""
     This tokenizer breaks Hindi text into subword units using Byte Pair Encoding (BPE).
-    Each token is highlighted with a different pastel color.
+    Each token is displayed in a separate box.
     The tokenizer has a vocabulary of 4,500 tokens and achieves ~3.5x compression on Hindi text.
     """,
     examples=[
