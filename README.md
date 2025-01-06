@@ -20,7 +20,7 @@ A Byte Pair Encoding (BPE) tokenizer for the Devanagari script. Trained on clean
 - Handles common Hindi text patterns effectively
 - Built-in text cleaning and normalization
 
-![Hindi BPE Tokenizer](./assets/hindi-tokenizer.png)
+![Hindi BPE Tokenizer](./assets/hindi_tokenizer_5100.png)
 
 The longest tokens in the vocabulary are:
 
@@ -28,6 +28,17 @@ The longest tokens in the vocabulary are:
 Length 63: तहसील में भारत के उत्तराखण्ड राज्य के अन्तर्गत कुमाऊँ मण्डल के 
 Length 54: तहसील में भारत के उत्तराखण्ड राज्य के अन्तर्गत कुमाऊँ 
 Length 38: भारत के आन्ध्रप्रदेश राज्य के अन्तर्गत
+```
+
+## Usage
+
+```python
+from encoder import BytePairEncoder
+
+encoder = BytePairEncoder.load_from_file("assets/hindi_tokenizer_5100.json")
+tokenizer = GreedyBPE(encoder)
+
+tokenizer.tokenize("नमस्ते दुनिया")
 ```
 
 ## Dataset Selection

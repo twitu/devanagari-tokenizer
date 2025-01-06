@@ -4,6 +4,15 @@ from matplotlib import pyplot as plt
 import json
 
 
+class TrieNode:
+    """Node in the prefix tree (trie) for fast token matching"""
+
+    def __init__(self):
+        self.children = {}
+        self.is_token = False
+        self.token = None
+
+
 class BytePairEncoder:
     def __init__(self, text: str):
         # Initialize vocabulary from characters
@@ -78,7 +87,7 @@ class BytePairEncoder:
     def merge_byte_pair(self) -> tuple[int, str, int]:
         """
         Merge the top byte pair
-        
+
         Returns:
             tuple: (new_token_id, new_token_str, merge_count) or None if no more pairs to merge
         """
@@ -86,25 +95,25 @@ class BytePairEncoder:
         stats = self.get_digram_stats()
         if not stats:  # No more pairs to merge
             return None
-        
+
         # Find most frequent pair
         (top_pair, count) = max(stats.items(), key=lambda x: x[1])
-        
+
         # Add new token to vocabulary
         new_idx = self.encode_pair(top_pair)
-        
+
         # Replace pairs in data
         self.data = self.replace_byte_pair_in_data(top_pair, new_idx)
-        
+
         # Update statistics
         self.update_stats(count, self.itos[new_idx])
-        
+
         return new_idx, self.itos[new_idx], count
 
     def print_progress(self, iteration: int, new_token: str, merge_count: int):
         """
         Print training progress in text format
-        
+
         Args:
             iteration: Current iteration number
             new_token: Newly created token
@@ -117,21 +126,23 @@ class BytePairEncoder:
         print(f"Current compression ratio: {self.stats['compression_ratios'][-1]:.2f}")
         print("-" * 80)
 
-    def encode_to_vocab_size(self, target_vocab_size: int, 
-                            plot_interval: int = None, 
-                            print_interval: int = 100) -> None:
+    def encode_to_vocab_size(
+        self,
+        target_vocab_size: int,
+        plot_interval: int = None,
+        print_interval: int = 100,
+    ) -> None:
         """
         Perform BPE encoding until reaching target vocabulary size
-        
+
         Args:
             target_vocab_size: Maximum vocabulary size to reach
             plot_interval: How often to plot statistics (None for no plotting)
             print_interval: How often to print progress (None for no printing)
         """
-        mode = "parallel" if len(self.data) >= self.MULTIPROCESSING_THRESHOLD else "sequential"
         pbar = tqdm(
             total=target_vocab_size,
-            desc=f"Encoding byte pairs ({mode} mode)",
+            desc=f"Encoding byte pairs",
             initial=len(self.chars),
             position=0,
             leave=True,
@@ -144,23 +155,23 @@ class BytePairEncoder:
             if result is None:  # No more pairs to merge
                 print("No more pairs to merge!")
                 break
-            
+
             new_idx, new_token, merge_count = result
             iteration += 1
-            
+
             # Update progress bar
             pbar.update(1)
-            
+
             # Print progress at intervals if requested
             if print_interval and iteration % print_interval == 0:
                 self.print_progress(iteration, new_token, merge_count)
-            
+
             # Plot statistics at intervals if requested
             if plot_interval and iteration % plot_interval == 0:
                 self.plot_statistics(iteration=iteration, live_plot=True)
 
         pbar.close()
-        
+
         # Final statistics
         print(f"\nTraining completed after {iteration:,} iterations")
         print(f"Final vocabulary size: {len(self.itos):,}")
@@ -168,15 +179,16 @@ class BytePairEncoder:
     def plot_statistics(self, iteration: int = None, live_plot: bool = False):
         """
         Visualize the encoding statistics
-        
+
         Args:
             iteration: Current iteration number (for live plotting)
             live_plot: Whether to clear output for live updates
         """
         if live_plot:
             from IPython.display import clear_output
+
             clear_output(wait=True)
-        
+
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
 
         # Plot 1: Vocabulary Size vs Data Size
@@ -207,51 +219,21 @@ class BytePairEncoder:
             ax4.set_title("Token Length Evolution")
 
         plt.tight_layout()
-        
+
         # Print current statistics if live plotting
         if iteration is not None:
             print(f"\nIteration {iteration}")
             print(f"Current vocabulary size: {len(self.itos):,}")
             print(f"Current data size: {len(self.data):,}")
-            print(f"Current compression ratio: {self.stats['compression_ratios'][-1]:.2f}")
-        
+            print(
+                f"Current compression ratio: {self.stats['compression_ratios'][-1]:.2f}"
+            )
+
         plt.show()
-
-    def tokenize(self, text: str) -> list[str]:
-        """
-        Tokenize text by checking all possible prefixes up to max_token_length
-        and selecting the longest matching token.
-
-        Args:
-            text: Input text to tokenize
-        Returns:
-            List of tokens
-        """
-        tokens = []
-        while len(text) > 0:
-            # Try prefixes of increasing length up to max_token_length
-            best_token = None
-            prefix_length = min(len(text), self.max_token_length)
-
-            for length in range(1, prefix_length + 1):
-                prefix = text[:length]
-                if prefix in self.stoi:
-                    best_token = prefix
-
-            if best_token is None:
-                # No token found - take first character
-                tokens.append(text[0])
-                text = text[1:]
-            else:
-                # Use the longest matching token found
-                tokens.append(best_token)
-                text = text[len(best_token) :]
-
-        return tokens
 
     def encode(self, text: str) -> list[int]:
         """Convert text to token indices"""
-        return [self.stoi[token] for token in self.tokenize(text)]
+        return [self.stoi[c] for c in text]
 
     def decode(self, token_ids: list[int]) -> str:
         """Convert token indices back to text"""
@@ -303,6 +285,194 @@ class BytePairEncoder:
         instance.stats = state["stats"]
 
         return instance
+
+    def continue_training(
+        self,
+        text: str,
+        target_vocab_size: int,
+        plot_interval: int = None,
+        print_interval: int = 100,
+    ) -> None:
+        """
+        Continue training from current vocabulary state using new text
+
+        Args:
+            text: New text to train on
+            target_vocab_size: New target vocabulary size
+            plot_interval: How often to plot statistics
+            print_interval: How often to print progress
+        """
+        # Store new original length for compression ratio
+        self.original_length = len(text)
+
+        # First encode the new text using current vocabulary
+        print("Encoding new text with current vocabulary...")
+        tokenizer = GreedyBPE(self)
+
+        # Convert text to token IDs with progress bar
+        self.data = [
+            self.stoi[token]
+            for token in tqdm(
+                tokenizer.tokenize(text),
+                total=len(text),
+                desc="Tokenizing text",
+                leave=False,
+            )
+        ]
+
+        # Continue training
+        print(
+            f"\nContinuing training from {len(self.itos):,} to {target_vocab_size:,} tokens..."
+        )
+        pbar = tqdm(
+            total=target_vocab_size,
+            desc=f"Encoding byte pairs",
+            initial=len(self.itos),
+            position=0,
+            leave=True,
+        )
+
+        iteration = 0
+        while len(self.itos) < target_vocab_size:
+            # Train one iteration
+            result = self.merge_byte_pair()
+            if result is None:  # No more pairs to merge
+                print("No more pairs to merge!")
+                break
+
+            new_idx, new_token, merge_count = result
+            iteration += 1
+
+            # Update progress bar
+            pbar.update(1)
+
+            # Print progress at intervals if requested
+            if print_interval and iteration % print_interval == 0:
+                self.print_progress(iteration, new_token, merge_count)
+
+            # Plot statistics at intervals if requested
+            if plot_interval and iteration % plot_interval == 0:
+                self.plot_statistics(iteration=iteration, live_plot=True)
+
+        pbar.close()
+        print(f"\nTraining completed. Final vocabulary size: {len(self.itos):,}")
+
+
+def _tokenize_chunk(text: str, stoi: dict, max_token_length: int) -> list[str]:
+    """Helper function for parallel tokenization that takes explicit arguments"""
+    tokens = []
+    while len(text) > 0:
+        # Try prefixes of increasing length
+        best_token = None
+        prefix_length = min(len(text), max_token_length)
+
+        for length in range(1, prefix_length + 1):
+            prefix = text[:length]
+            if prefix in stoi:
+                best_token = prefix
+
+        if best_token is None:
+            tokens.append(text[0])
+            text = text[1:]
+        else:
+            tokens.append(best_token)
+            text = text[len(best_token) :]
+    return tokens
+
+
+class GreedyBPE:
+    """Greedy tokenizer for Byte Pair Encoding"""
+
+    def __init__(self, encoder: "BytePairEncoder", use_trie: bool = True):
+        self.stoi = encoder.stoi
+        self.max_token_length = encoder.max_token_length
+        self.use_trie = use_trie
+        self._trie_root = None
+
+    def _build_trie(self) -> TrieNode:
+        """Build a trie from the vocabulary for faster tokenization"""
+        root = TrieNode()
+        for token in self.stoi.keys():
+            node = root
+            for char in token:
+                if char not in node.children:
+                    node.children[char] = TrieNode()
+                node = node.children[char]
+            node.is_token = True
+            node.token = token
+        return root
+
+    def tokenize(self, text: str) -> "TokenIterator":
+        """
+        Create an iterator over tokens in the text
+
+        Args:
+            text: Input text to tokenize
+        Returns:
+            Iterator yielding tokens
+        """
+        return TokenIterator(self, text)
+
+
+class TokenIterator:
+    """Iterator for greedy BPE tokenization"""
+
+    def __init__(self, tokenizer: GreedyBPE, text: str):
+        self.tokenizer = tokenizer
+        self.text = text
+        self.pos = 0
+
+        # Build trie if needed and enabled
+        if tokenizer.use_trie:
+            if tokenizer._trie_root is None:
+                tokenizer._trie_root = tokenizer._build_trie()
+            self.use_trie = True
+        else:
+            self.use_trie = False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> str:
+        if self.pos >= len(self.text):
+            raise StopIteration
+
+        if self.use_trie:
+            token = self._next_token_trie()
+        else:
+            token = self._next_token_simple()
+
+        self.pos += len(token)
+        return token
+
+    def _next_token_simple(self) -> str:
+        """Find next token using simple prefix matching"""
+        best_token = None
+        prefix_length = min(len(self.text) - self.pos, self.tokenizer.max_token_length)
+
+        for length in range(1, prefix_length + 1):
+            prefix = self.text[self.pos : self.pos + length]
+            if prefix in self.tokenizer.stoi:
+                best_token = prefix
+
+        return best_token or self.text[self.pos]
+
+    def _next_token_trie(self) -> str:
+        """Find next token using trie matching"""
+        node = self.tokenizer._trie_root
+        longest_token = None
+
+        for i in range(
+            self.pos, min(len(self.text), self.pos + self.tokenizer.max_token_length)
+        ):
+            char = self.text[i]
+            if char not in node.children:
+                break
+            node = node.children[char]
+            if node.is_token:
+                longest_token = node.token
+
+        return longest_token or self.text[self.pos]
 
 
 # # Example usage

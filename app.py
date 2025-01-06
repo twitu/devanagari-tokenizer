@@ -42,7 +42,7 @@ def process_text(text: str) -> tuple[gr.HTML, dict]:
     return html, stats
 
 # Initialize tokenizer
-tokenizer = TokenVisualizer("hindi_tokenizer.json")
+tokenizer = TokenVisualizer("assets/hindi_tokenizer_5100.json")
 
 # Create Gradio interface
 demo = gr.Interface(

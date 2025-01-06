@@ -1,5 +1,4 @@
 # %%
-import os
 import re
 from pathlib import Path
 from encoder import BytePairEncoder
@@ -113,4 +112,74 @@ def main():
         print(f"Tokens: {tokens}")
 
 # %%
-main()
+def continue_training():
+    # Configuration
+    data_dir = "train/train"
+    initial_model = "assets/hindi_tokenizer.json"
+    final_model = "assets/hindi_tokenizer_5100.json"
+    target_vocab_size = 5100
+    
+    # Load and clean more text
+    print("Loading and cleaning additional text...")
+    text = load_hindi_text(data_dir, max_files=10000)
+    
+    # Load existing encoder
+    print("\nLoading existing encoder...")
+    encoder = BytePairEncoder.load_from_file(initial_model)
+    print(f"Current vocabulary size: {len(encoder.itos):,}")
+    
+
+    # Continue training
+    print("\nContinuing training...")
+    encoder.continue_training(
+        text,
+        target_vocab_size,
+        plot_interval=20,
+        print_interval=None,
+    )
+    
+    # Save the updated encoder
+    print("\nSaving encoder...")
+    encoder.save_to_file(final_model)
+    
+    # Plot final statistics
+    print("\nPlotting final statistics...")
+    encoder.plot_statistics()
+    
+    # Print some example tokenizations
+    print("\nExample tokenizations:")
+    test_texts = [
+        "नमस्ते दुनिया",
+        "मैं हिंदी सीख रहा हूं",
+        "भारत एक महान देश है"
+    ]
+    
+    for text in test_texts:
+        tokens = encoder.tokenize(text)
+        print(f"\nText: {text}")
+        print(f"Tokens: {tokens}")
+
+
+# %%
+continue_training()
+
+# %%
+from encoder import GreedyBPE
+
+encoder = BytePairEncoder.load_from_file("assets/hindi_tokenizer_5100.json")
+tokenizer = GreedyBPE(encoder)
+
+print("\nExample tokenizations:")
+test_texts = [
+    "नमस्ते दुनिया",
+    "मैं हिंदी सीख रहा हूं",
+    "भारत एक महान देश है"
+]
+    
+for text in test_texts:
+    tokens = tokenizer.tokenize(text)
+    print(f"\nText: {text}")
+    print(f"Tokens: {' '.join(tokens)}")
+
+
+# %%
