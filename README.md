@@ -1,4 +1,14 @@
-# Hindi BPE Tokenizer
+---
+title: Devanagari Tokenizer
+emoji: 🏆
+colorFrom: gray
+colorTo: yellow
+sdk: gradio
+sdk_version: 5.9.1
+app_file: app.py
+pinned: false
+short_description: देवnagari tokenizer | >3.2 compression ratio | 4500 tokens
+---
 
 A Byte Pair Encoding (BPE) tokenizer for the Devanagari script. Trained on cleaned Wikipedia hindi articles, this tokenizer achieves a compression ratio of 3.5x using a vocabulary of just 4,500 tokens.
 
